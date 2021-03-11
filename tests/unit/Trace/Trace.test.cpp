@@ -1,0 +1,246 @@
+#include <llvm/AsmParser/Parser.h>
+
+#include <catch2/catch.hpp>
+
+#include "Trace/ProgramTrace.h"
+
+CATCH_REGISTER_ENUM(race::Event::Type, race::Event::Type::Read,
+                    race::Event::Type::Write, race::Event::Type::Fork,
+                    race::Event::Type::Join, race::Event::Type::Call,
+                    race::Event::Type::CallEnd)
+TEST_CASE("ThreadTrace construction", "[unit][event]") {
+  const char *modString = R"(
+declare void @print(i64)
+
+define void @adder(i64* %c) {
+    %val = load i64, i64* %c
+    %add = add nsw i64 %val, 42
+    store i64 %add, i64* %c
+    ret void
+}
+
+define void @foo() {
+    %x = alloca i64
+    call void @adder(i64* %x)
+    %pval = load i64, i64* %x
+    call void @print(i64 %pval)
+    ret void
+}
+)";
+
+  llvm::LLVMContext Ctx;
+  llvm::SMDiagnostic Err;
+  auto module = llvm::parseAssemblyString(modString, Err, Ctx);
+
+  // Actual PTA
+  auto pta = std::make_unique<pta::PTA>();
+  pta->analyze(module.get(), "foo");
+
+  race::ProgramTrace program(*pta);
+  auto const &threads = program.getThreads();
+  REQUIRE(threads.size() == 1);
+
+  auto const &thread = threads.at(0);
+  auto const &events = thread->getEvents();
+  REQUIRE(events.size() == 5);
+  REQUIRE(events.at(0)->type == race::Event::Type::Call);
+  REQUIRE(events.at(1)->type == race::Event::Type::Read);
+  REQUIRE(events.at(2)->type == race::Event::Type::Write);
+  REQUIRE(events.at(3)->type == race::Event::Type::CallEnd);
+  REQUIRE(events.at(4)->type == race::Event::Type::Read);
+}
+
+TEST_CASE("Construct pthread ThreadTrace", "[unit][event]") {
+  const char *ModuleString = R"(
+%union.pthread_attr_t = type { i64, [48 x i8] }
+
+define i8* @entry(i8*) {
+    %c = alloca i64
+    %val = load i64, i64* %c
+    %add = add nsw i64 %val, 42
+    store i64 %add, i64* %c
+    ret i8* null
+}
+
+define void @foo() {
+  %p_thread = alloca i64
+  %1 = call i32 @pthread_create(i64* %p_thread, %union.pthread_attr_t* null, i8* (i8*)* @entry, i8* null)
+  %thread = load i64, i64* %p_thread
+  %2 = call i32 @pthread_join(i64 %thread, i8** null)
+  ret void
+}
+
+declare i32 @pthread_create(i64*, %union.pthread_attr_t*, i8* (i8*)*, i8*)
+declare i32 @pthread_join(i64, i8**)
+)";
+
+  llvm::LLVMContext Ctx;
+  llvm::SMDiagnostic Err;
+  auto module = llvm::parseAssemblyString(ModuleString, Err, Ctx);
+  if (!module) {
+    Err.print("error", llvm::errs());
+  }
+
+  // Actual PTA
+  auto pta = std::make_unique<pta::PTA>();
+  pta->analyze(module.get(), "foo");
+
+  race::ProgramTrace program(*pta);
+  auto const &threads = program.getThreads();
+  REQUIRE(threads.size() == 2);
+
+  SECTION("Main ThreadTrace") {
+    auto const &thread = threads.at(0);
+    auto const &events = thread->getEvents();
+    REQUIRE(events.size() == 3);
+
+    auto const &fork = events.at(0);
+    CHECK(fork->type == race::Event::Type::Fork);
+    CHECK(&fork->getThread() == thread.get());
+    CHECK(&fork->getThread().program == &program);
+
+    auto const &join = events.at(2);
+    CHECK(join->type == race::Event::Type::Join);
+  }
+
+  SECTION("Spawned ThreadTrace") {
+    auto const &thread = threads.at(1);
+    auto const &events = thread->getEvents();
+    REQUIRE(events.size() == 2);
+    CHECK(events.at(0)->type == race::Event::Type::Read);
+    CHECK(events.at(1)->type == race::Event::Type::Write);
+  }
+
+  SECTION("ThreadTrace Increasing Event IDs") {
+    auto const &events = threads.at(0)->getEvents();
+    auto prevID = events.front()->getID();
+    for (auto it = events.begin() + 1, end = events.end(); it != end; ++it) {
+      auto currentID = (*it)->getID();
+      REQUIRE(currentID > prevID);
+      prevID = currentID;
+    }
+  }
+}
+
+TEST_CASE("Nested Pthread ThreadTrace", "[unit][event]") {
+  const char *ModuleString = R"(
+%union.pthread_attr_t = type { i64, [48 x i8] }
+
+define i8* @entryOuter(i8*) {
+  %p_sub_thread = alloca i64
+  %2 = call i32 @pthread_create(i64* %p_sub_thread, %union.pthread_attr_t* null, i8* (i8*)* @entryInner, i8* null)
+  %sub_thread = load i64, i64* %p_sub_thread
+  %3 = call i32 @pthread_join(i64 %sub_thread, i8** null)
+  ret i8* null
+}
+
+define i8* @entryInner(i8*) {
+    %c = alloca i64
+    %val = load i64, i64* %c
+    %add = add nsw i64 %val, 42
+    store i64 %add, i64* %c
+    ret i8* null
+}
+
+define void @foo() {
+  %p_thread = alloca i64
+  %1 = call i32 @pthread_create(i64* %p_thread, %union.pthread_attr_t* null, i8* (i8*)* @entryOuter, i8* null)
+  %thread = load i64, i64* %p_thread
+  %2 = call i32 @pthread_join(i64 %thread, i8** null)
+  ret void
+}
+
+declare i32 @pthread_create(i64*, %union.pthread_attr_t*, i8* (i8*)*, i8*)
+declare i32 @pthread_join(i64, i8**)
+)";
+
+  llvm::LLVMContext Ctx;
+  llvm::SMDiagnostic Err;
+  auto module = llvm::parseAssemblyString(ModuleString, Err, Ctx);
+  if (!module) {
+    Err.print("error", llvm::errs());
+  }
+
+  // Actual PTA
+  auto pta = std::make_unique<pta::PTA>();
+  pta->analyze(module.get(), "foo");
+
+  race::ProgramTrace program(*pta);
+  auto const &threads = program.getThreads();
+  REQUIRE(threads.size() == 3);
+
+  SECTION("Main ThreadTrace") {
+    auto const &thread = threads.at(0);
+    auto const &events = thread->getEvents();
+    REQUIRE(events.size() == 3);
+
+    auto const &fork = events.at(0);
+    CHECK(fork->type == race::Event::Type::Fork);
+
+    auto const &join = events.at(2);
+    CHECK(join->type == race::Event::Type::Join);
+  }
+
+  SECTION("Spawned ThreadTrace") {
+    auto const &thread = threads.at(1);
+    auto const &events = thread->getEvents();
+    REQUIRE(events.size() == 3);
+
+    auto const &fork = events.at(0);
+    CHECK(fork->type == race::Event::Type::Fork);
+
+    auto const &join = events.at(2);
+    CHECK(join->type == race::Event::Type::Join);
+  }
+
+  SECTION("Sub Spawned ThreadTrace") {
+    auto const &thread = threads.at(2);
+    auto const &events = thread->getEvents();
+    REQUIRE(events.size() == 2);
+    CHECK(events.at(0)->type == race::Event::Type::Read);
+    CHECK(events.at(1)->type == race::Event::Type::Write);
+  }
+}
+
+TEST_CASE("Construct mutex ThreadTrace", "[unit][event]") {
+  const char *ModuleString = R"(
+%union.pthread_mutex_t = type { %struct.__pthread_mutex_s }
+%struct.__pthread_mutex_s = type { i32, i32, i32, i32, i32, i16, i16, %struct.__pthread_internal_list }
+%struct.__pthread_internal_list = type { %struct.__pthread_internal_list*, %struct.__pthread_internal_list* }
+
+define dso_local i32 @main() #0 {
+  %mutex = alloca %union.pthread_mutex_t
+  %call = call i32 @pthread_mutex_lock(%union.pthread_mutex_t* %mutex)
+  %call1 = call i32 @pthread_mutex_unlock(%union.pthread_mutex_t* %mutex)
+  ret i32 0
+}
+
+declare i32 @pthread_mutex_lock(%union.pthread_mutex_t*) #1
+declare i32 @pthread_mutex_unlock(%union.pthread_mutex_t*) #1
+)";
+
+  llvm::LLVMContext Ctx;
+  llvm::SMDiagnostic Err;
+  auto module = llvm::parseAssemblyString(ModuleString, Err, Ctx);
+  if (!module) {
+    Err.print("error", llvm::errs());
+  }
+
+  // Actual PTA
+  auto pta = std::make_unique<pta::PTA>();
+  pta->analyze(module.get(), "main");
+
+  race::ProgramTrace program(*pta);
+  auto const &threads = program.getThreads();
+  REQUIRE(threads.size() == 1);
+
+  auto const &thread = threads.at(0);
+  auto const &events = thread->getEvents();
+  REQUIRE(events.size() == 2);
+
+  auto const &lock = events.at(0);
+  CHECK(lock->type == race::Event::Type::Lock);
+
+  auto const &unlock = events.at(1);
+  CHECK(unlock->type == race::Event::Type::Unlock);
+}
