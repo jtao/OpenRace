@@ -2,7 +2,9 @@
 
 #include <llvm/IR/Instructions.h>
 
-#include "IR/InfoImpls.h"
+#include "IR/IRImpls.h"
+#include "LanguageModel/OpenMP.h"
+#include "LanguageModel/pthread.h"
 
 using namespace race;
 
@@ -14,10 +16,6 @@ bool hasNoAliasMD(const llvm::Instruction *inst) {
 }
 
 // TODO: need different system for storing and organizing these "recognizers"
-bool isPthreadCreate(const llvm::StringRef &funcName) { return funcName.equals("pthread_create"); }
-bool isPthreadJoin(const llvm::StringRef &funcName) { return funcName.equals("pthread_join"); }
-bool isPthreadMutexLock(const llvm::StringRef &funcName) { return funcName.equals("pthread_mutex_lock"); }
-bool isPthreadMutexUnlock(const llvm::StringRef &funcName) { return funcName.equals("pthread_mutex_unlock"); }
 bool isPrintf(const llvm::StringRef &funcName) { return funcName.equals("printf"); }
 bool isLLVMDebug(const llvm::StringRef &funcName) { return funcName.equals("llvm.dbg.declare"); }
 }  // namespace
@@ -39,12 +37,12 @@ RaceFunction race::generateRaceFunction(const llvm::Function &func) {
         if (loadInst->isAtomic() || loadInst->isVolatile() || hasNoAliasMD(loadInst)) {
           continue;
         }
-        instructions.push_back(std::make_shared<race::LoadInfo>(loadInst));
+        instructions.push_back(std::make_shared<race::LoadIR>(loadInst));
       } else if (auto storeInst = llvm::dyn_cast<llvm::StoreInst>(inst)) {
         if (storeInst->isAtomic() || storeInst->isVolatile() || hasNoAliasMD(storeInst)) {
           continue;
         }
-        instructions.push_back(std::make_shared<race::StoreInfo>(storeInst));
+        instructions.push_back(std::make_shared<race::StoreIR>(storeInst));
       } else if (auto retInst = llvm::dyn_cast<llvm::ReturnInst>(inst)) {
         // TODO: what should this do?
       } else if (auto branchInst = llvm::dyn_cast<llvm::BranchInst>(inst)) {
@@ -54,7 +52,7 @@ RaceFunction race::generateRaceFunction(const llvm::Function &func) {
       } else if (auto callInst = llvm::dyn_cast<llvm::CallBase>(inst)) {
         if (callInst->isIndirectCall()) {
           // let trace deal with indirect calls
-          instructions.push_back(std::make_shared<race::CallInfo>(callInst));
+          instructions.push_back(std::make_shared<race::CallIR>(callInst));
           continue;
         }
 
@@ -67,20 +65,22 @@ RaceFunction race::generateRaceFunction(const llvm::Function &func) {
 
         // TODO: System for users to register new function recognizers here
         auto funcName = calledFunc->getName();
-        if (isPthreadCreate(funcName)) {
-          instructions.push_back(std::make_shared<PthreadCreateInfo>(callInst));
-        } else if (isPthreadJoin(funcName)) {
-          instructions.push_back(std::make_shared<PthreadJoinInfo>(callInst));
-        } else if (isPthreadMutexLock(funcName)) {
-          instructions.push_back(std::make_shared<PthreadMutexLockInfo>(callInst));
-        } else if (isPthreadMutexUnlock(funcName)) {
-          instructions.push_back(std::make_shared<PthreadMutexUnlockInfo>(callInst));
+        if (PthreadModel::isPthreadCreate(funcName)) {
+          instructions.push_back(std::make_shared<PthreadCreateIR>(callInst));
+        } else if (PthreadModel::isPthreadJoin(funcName)) {
+          instructions.push_back(std::make_shared<PthreadJoinIR>(callInst));
+        } else if (PthreadModel::isPthreadMutexLock(funcName)) {
+          instructions.push_back(std::make_shared<PthreadMutexLockIR>(callInst));
+        } else if (PthreadModel::isPthreadMutexUnlock(funcName)) {
+          instructions.push_back(std::make_shared<PthreadMutexUnlockIR>(callInst));
+        } else if (OpenMPModel::isFork(funcName)) {
+          instructions.push_back(std::make_shared<OpenMPForkIR>(callInst));
         } else if (isPrintf(funcName)) {
           // TODO: model as read?
         } else if (isLLVMDebug(funcName)) {
           // Skip
         } else {
-          instructions.push_back(std::make_shared<CallInfo>(callInst));
+          instructions.push_back(std::make_shared<CallIR>(callInst));
         }
       }
     }
