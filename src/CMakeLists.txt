@@ -44,5 +44,9 @@ add_library(racedetect STATIC ${racedetect-lib-sources})
 target_link_libraries(racedetect pta)
 target_include_directories(racedetect PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(racedetect SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
-# target_compile_options(racedetect PUBLIC -fno-rtti)
-# target_compile_features(racedetect PUBLIC cxx_std_17)
+
+
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+    enable_warnings(pta)
+    enable_warnings(racedetect)
+endif()
