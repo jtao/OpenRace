@@ -12,7 +12,7 @@ add_executable(tester
     unit/Trace/OpenMPTrace.test.cpp
     
     integration/pthreadrace.test.cpp
-    #integration/dataracebench.test.cpp
+    integration/dataracebench.test.cpp
 )
 target_link_libraries(tester pta racedetect ${llvm_libs} CONAN_PKG::catch2)
 target_include_directories(tester PRIVATE ${LLVM_INCLUDE_DIRS})

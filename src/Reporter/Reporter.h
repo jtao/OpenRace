@@ -38,6 +38,9 @@ struct Race {
 };
 
 using Report = std::vector<Race>;
+// Helpers for testing
+bool reportContains(const Report &report, Race race);
+bool reportContains(const Report &report, std::vector<Race> races);
 
 class Reporter {
   std::vector<std::pair<const WriteEvent *, const MemAccessEvent *>> races;

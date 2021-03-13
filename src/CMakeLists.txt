@@ -39,6 +39,7 @@ set(racedetect-lib-sources
     Trace/EventImpl.cpp
     Trace/ProgramTrace.cpp
     Trace/ThreadTrace.cpp
+    RaceDetect/RaceDetect.cpp
     Reporter/Reporter.cpp)
 add_library(racedetect STATIC ${racedetect-lib-sources})
 target_link_libraries(racedetect pta)

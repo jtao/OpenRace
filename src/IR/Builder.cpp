@@ -74,7 +74,9 @@ RaceFunction race::generateRaceFunction(const llvm::Function &func) {
         } else if (PthreadModel::isPthreadMutexUnlock(funcName)) {
           instructions.push_back(std::make_shared<PthreadMutexUnlockIR>(callInst));
         } else if (OpenMPModel::isFork(funcName)) {
-          instructions.push_back(std::make_shared<OpenMPForkIR>(callInst));
+          auto ompFork = std::make_shared<OpenMPForkIR>(callInst);
+          instructions.push_back(ompFork);
+          instructions.push_back(std::make_shared<OpenMPJoinIR>(ompFork));
         } else if (isPrintf(funcName)) {
           // TODO: model as read?
         } else if (isLLVMDebug(funcName)) {
