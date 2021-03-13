@@ -269,7 +269,7 @@ class NodeIDWrapperEdgeIterator
   explicit NodeIDWrapperEdgeIterator() = default;
 
   explicit NodeIDWrapperEdgeIterator(GraphT *G, const NodeIDEdgeIteratorT &i) : G(G), BaseT(i) {}
-  explicit NodeIDWrapperEdgeIterator(GraphT *G, NodeIDEdgeIteratorT &&i) : G(G), BaseT(std::move(i)) {}
+  explicit NodeIDWrapperEdgeIterator(GraphT *G, NodeIDEdgeIteratorT &&i) : BaseT(std::move(i)), G(G) {}
 
   ValueT operator*() const {
     NodeID id = (*(this->I)).second;

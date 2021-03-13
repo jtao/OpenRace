@@ -41,7 +41,7 @@ class PartialUpdateSolver : public SolverBase<LangModel, PartialUpdateSolver<Lan
     Self &solver;
 
    public:
-    CallBack(Self &solver, size_t nodeNum) : solver(solver), nodeNum(nodeNum) {}
+    CallBack(Self &solver, size_t nodeNum) : nodeNum(nodeNum), solver(solver) {}
 
     void onNewConstraint(CGNodeTy *src, CGNodeTy *dst, Constraints constraint) override {
       switch (constraint) {

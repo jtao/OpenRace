@@ -340,7 +340,6 @@ class SolverBase {
     ProcessedStore++;
     bool changed = false;
     for (auto it = PT::begin(dst->getNodeID()), ie = PT::end(dst->getNodeID()); it != ie; it++) {
-      auto tmp = llvm::dyn_cast<ObjNodeTy>(consGraph->getCGNode(*it));
       auto node = consGraph->getObjectNode(*it);
       node = node->getSuperNode();
 
