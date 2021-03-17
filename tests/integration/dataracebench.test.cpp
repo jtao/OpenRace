@@ -16,6 +16,7 @@ limitations under the License.
 
 #include <catch2/catch.hpp>
 
+#include "PreProcessing/Passes/DuplicateOpenMPForks.h"
 #include "RaceDetect/RaceDetect.h"
 #include "Reporter/Reporter.h"
 
@@ -29,11 +30,13 @@ TEST_CASE("dataracebench", "[integration][dataracebench][omp]") {
   }
   REQUIRE(module.get() != nullptr);
 
+  duplicateOpenMPForks(*module);
+
   auto report = race::detectRaces(module.get());
 
   llvm::errs() << "races\n";
   for (auto const &race : report) {
-    llvm::errs() << race.first << " " << race.second << "\n";
+    llvm::errs() << race << "\n";
   }
 
   race::Race race = {{"DRB001-antidep1-orig-yes.c", 64, 9}, {"DRB001-antidep1-orig-yes.c", 66, 26}};
