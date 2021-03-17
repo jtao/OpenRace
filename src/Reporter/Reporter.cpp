@@ -38,7 +38,14 @@ void Reporter::collect(const WriteEvent *e1, const MemAccessEvent *e2) { races.e
 Report Reporter::getReport() const {
   Report report;
   for (auto const &racepair : races) {
-    Race race(getSourceLoc(racepair.first), getSourceLoc(racepair.second));
+    auto const loc1 = getSourceLoc(racepair.first);
+    auto const loc2 = getSourceLoc(racepair.second);
+    Race race(loc1, loc2);
+    if (loc1.isUnkown() || loc2.isUnkown()) {
+      llvm::errs() << "skipping race with unknown location: " << race << "\n";
+      continue;
+    }
+
     report.insert(race);
   }
   return report;

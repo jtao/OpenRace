@@ -24,6 +24,9 @@ struct SourceLoc {
   explicit SourceLoc(const llvm::DILocation *loc)
       : filename(loc->getFilename()), line(loc->getLine()), col(loc->getColumn()) {}
 
+  // Location is unknown
+  bool isUnkown() const { return filename == "UNKOWN"; }
+
   inline bool operator==(const SourceLoc &other) const {
     return filename == other.filename && line == other.line && col == other.col;
   }
