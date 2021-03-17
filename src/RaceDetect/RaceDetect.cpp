@@ -1,9 +1,13 @@
 #include "RaceDetect/RaceDetect.h"
 
+#include "PreProcessing/Passes/DuplicateOpenMPForks.h"
+
 using namespace race;
 
 Report race::detectRaces(llvm::Module *module) {
   race::Reporter reporter;
+
+  duplicateOpenMPForks(*module);
 
   // Actual PTA
   auto pta = std::make_unique<pta::PTA>();

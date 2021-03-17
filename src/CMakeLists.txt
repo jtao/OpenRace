@@ -17,6 +17,7 @@ set(pta-lib-sources
     PreProcessing/Passes/InsertGlobalCtorCallPass.cpp
     PreProcessing/Passes/LoweringMemCpyPass.cpp
     PreProcessing/Passes/RemoveExceptionHandlerPass.cpp
+    PreProcessing/Passes/DuplicateOpenMPForks.cpp
     
     LanguageModel/RaceModel.cpp)
 

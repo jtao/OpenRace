@@ -7,6 +7,7 @@ add_executable(tester
     unit/IR/IR.test.cpp
     unit/IR/OpenMPIR.test.cpp
     unit/PointerAnalysis/PointerAnalysis.test.cpp
+    unit/PreProcessing/DuplicateOpenMPForks.test.cpp
     unit/Trace/CallStack.test.cpp
     unit/Trace/Trace.test.cpp
     unit/Trace/OpenMPTrace.test.cpp
