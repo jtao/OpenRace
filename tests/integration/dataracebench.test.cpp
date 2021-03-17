@@ -20,7 +20,8 @@ limitations under the License.
 #include "RaceDetect/RaceDetect.h"
 #include "Reporter/Reporter.h"
 
-TEST_CASE("dataracebench", "[integration][dataracebench][omp]") {
+// OpenMP support is a work in progress
+TEST_CASE("dataracebench", "[!mayfail][integration][dataracebench][omp]") {
   llvm::LLVMContext context;
   llvm::SMDiagnostic err;
 
