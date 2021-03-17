@@ -38,7 +38,8 @@ void Reporter::collect(const WriteEvent *e1, const MemAccessEvent *e2) { races.e
 Report Reporter::getReport() const {
   Report report;
   for (auto const &racepair : races) {
-    report.emplace_back(getSourceLoc(racepair.first), getSourceLoc(racepair.second));
+    Race race(getSourceLoc(racepair.first), getSourceLoc(racepair.second));
+    report.insert(race);
   }
   return report;
 }
@@ -56,4 +57,9 @@ bool race::reportContains(const Report &report, std::vector<Race> races) {
   }
 
   return races.empty();
+}
+
+llvm::raw_ostream &race::operator<<(llvm::raw_ostream &os, const Race &race) {
+  os << race.first << " " << race.second;
+  return os;
 }
