@@ -18,6 +18,7 @@ limitations under the License.
 
 #include "IR/Builder.h"
 #include "IR/IRImpls.h"
+#include "PreProcessing/Passes/DuplicateOpenMPForks.h"
 
 TEST_CASE("OpenMP", "[unit][IR][omp]") {
   const char *ModuleString = R"(
@@ -54,17 +55,29 @@ declare void @__kmpc_fork_call(%struct.ident_t*, i32, void (i32*, i32*, ...)*, .
     Err.print("error", llvm::errs());
     FAIL("no module");
   }
+
+  duplicateOpenMPForks(*module);
+
   auto func = module->getFunction("main");
 
   auto racefunc = race::generateRaceFunction(func);
-  REQUIRE(racefunc.size() == 2);
+  REQUIRE(racefunc.size() == 4);
 
   auto ompFork = llvm::dyn_cast<race::OpenMPForkIR>(racefunc.at(0).get());
   REQUIRE(ompFork);
   CHECK(ompFork->getInst()->getCalledFunction()->getName() == "__kmpc_fork_call");
   CHECK(ompFork->getThreadEntry()->getName() == ".omp_outlined.");
 
-  auto ompJoin = llvm::dyn_cast<race::OpenMPJoinIR>(racefunc.at(1).get());
+  ompFork = llvm::dyn_cast<race::OpenMPForkIR>(racefunc.at(1).get());
+  REQUIRE(ompFork);
+  CHECK(ompFork->getInst()->getCalledFunction()->getName() == "__kmpc_fork_call");
+  CHECK(ompFork->getThreadEntry()->getName() == ".omp_outlined.");
+
+  auto ompJoin = llvm::dyn_cast<race::OpenMPJoinIR>(racefunc.at(2).get());
+  REQUIRE(ompJoin);
+  CHECK(ompJoin->getInst()->getCalledFunction()->getName() == "__kmpc_fork_call");
+
+  ompJoin = llvm::dyn_cast<race::OpenMPJoinIR>(racefunc.at(3).get());
   REQUIRE(ompJoin);
   CHECK(ompJoin->getInst()->getCalledFunction()->getName() == "__kmpc_fork_call");
 }
