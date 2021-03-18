@@ -18,14 +18,7 @@ using namespace race;
 Report race::detectRaces(llvm::Module *module) {
   race::Reporter reporter;
 
-  // Run preprocessing on module
-  preprocess(*module);
-
-  // Actual PTA
-  auto pta = std::make_unique<pta::PTA>();
-  pta->analyze(module, "main");
-
-  race::ProgramTrace program(*pta);
+  race::ProgramTrace program(module);
   race::SharedMemory sharedmem(program);
   race::HappensBeforeGraph happensbefore(program);
   race::LockSet lockset(program);

@@ -55,13 +55,7 @@ declare void @__kmpc_fork_call(%struct.ident_t*, i32, void (i32*, i32*, ...)*, .
     FAIL("no module");
   }
 
-  duplicateOpenMPForks(*module);
-
-  // Actual PTA
-  auto pta = std::make_unique<pta::PTA>();
-  pta->analyze(module.get(), "main");
-
-  race::ProgramTrace program(*pta);
+  race::ProgramTrace program(module.get());
   auto const &threads = program.getThreads();
 
   // 1 main thread, 2 omp threads
