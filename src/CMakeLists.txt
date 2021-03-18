@@ -18,6 +18,7 @@ set(pta-lib-sources
     PreProcessing/Passes/LoweringMemCpyPass.cpp
     PreProcessing/Passes/RemoveExceptionHandlerPass.cpp
     PreProcessing/Passes/DuplicateOpenMPForks.cpp
+    PreProcessing/PreProcessing.cpp
     
     LanguageModel/RaceModel.cpp)
 

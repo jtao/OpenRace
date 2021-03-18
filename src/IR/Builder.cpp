@@ -34,8 +34,10 @@ std::shared_ptr<OpenMPForkIR> getTwinOmpFork(const llvm::CallBase *ompForkCall) 
 
   auto twinOmpForkInst = llvm::dyn_cast<llvm::Instruction>(next);
   if (!twinOmpForkInst) return nullptr;
+
   auto twinCallInst = llvm::dyn_cast<llvm::CallBase>(twinOmpForkInst);
   if (!twinCallInst) return nullptr;
+
   auto calledFunc = twinCallInst->getCalledFunction();
   if (calledFunc == nullptr || !calledFunc->hasName()) return nullptr;
   if (!OpenMPModel::isFork(calledFunc->getName())) return nullptr;
