@@ -15,6 +15,11 @@ limitations under the License.
 
 using namespace race;
 
+bool isRace(const race::WriteEvent *write, const race::MemAccessEvent *other, const HappensBeforeGraph &happensbefore,
+            const LockSet &lockset) {
+  return happensbefore.areParallel(write, other) && !lockset.sharesLock(write, other);
+}
+
 Report race::detectRaces(llvm::Module *module) {
   race::Reporter reporter;
 
@@ -22,14 +27,6 @@ Report race::detectRaces(llvm::Module *module) {
   race::SharedMemory sharedmem(program);
   race::HappensBeforeGraph happensbefore(program);
   race::LockSet lockset(program);
-
-  auto checkRace = [&](const race::WriteEvent *write, const race::MemAccessEvent *other) {
-    if (happensbefore.areParallel(write, other) && !lockset.sharesLock(write, other)) {
-      llvm::outs() << "Race between:\n\t" << *write->getIRInst()->getInst() << "\n\t" << *other->getIRInst()->getInst()
-                   << "\n";
-      reporter.collect(write, other);
-    }
-  };
 
   for (auto const sharedObj : sharedmem.getSharedObjects()) {
     auto threadedWrites = sharedmem.getThreadedWrites(sharedObj);
@@ -43,7 +40,9 @@ Report race::detectRaces(llvm::Module *module) {
         if (wtid == rtid) continue;
         for (auto write : writes) {
           for (auto read : reads) {
-            checkRace(write, read);
+            if (isRace(write, read, happensbefore, lockset)) {
+              reporter.collect(write, read);
+            }
           }
         }
       }
@@ -53,7 +52,9 @@ Report race::detectRaces(llvm::Module *module) {
         auto otherWrites = wit->second;
         for (auto write : writes) {
           for (auto otherWrite : otherWrites) {
-            checkRace(write, otherWrite);
+            if (isRace(write, otherWrite, happensbefore, lockset)) {
+              reporter.collect(write, otherWrite);
+            }
           }
         }
       }
