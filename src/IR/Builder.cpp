@@ -31,13 +31,13 @@ bool isPrintf(const llvm::StringRef &funcName) { return funcName.equals("printf"
 bool isLLVMDebug(const llvm::StringRef &funcName) { return funcName.equals("llvm.dbg.declare"); }
 }  // namespace
 
-RaceFunction race::generateRaceFunction(const llvm::Function *func) {
+FunctionSummary race::generateRaceFunction(const llvm::Function *func) {
   assert(func != nullptr);
   return generateRaceFunction(*func);
 }
 
-RaceFunction race::generateRaceFunction(const llvm::Function &func) {
-  RaceFunction instructions;
+FunctionSummary race::generateRaceFunction(const llvm::Function &func) {
+  FunctionSummary instructions;
 
   for (auto const &basicblock : func.getBasicBlockList()) {
     for (auto BI = basicblock.begin(), BE = basicblock.end(); BI != BE; ++BI) {
